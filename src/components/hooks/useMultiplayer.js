@@ -66,22 +66,26 @@ export const useMultiplayer = (currentUser = null) => {
   }, []);
 
   useEffect(() => {
-    // For local development, connect to localhost:5173
-    // For production, connect to Render backend
-    let serverUrl;
+    // Use environment variable if available, otherwise determine based on hostname
+    let serverUrl = import.meta.env.VITE_SERVER_URL;
 
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Local development
-      serverUrl = 'http://localhost:5173';
-      console.log('🏠 Local development - connecting to:', serverUrl);
+    if (!serverUrl) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Local development - connect to server on port 3001
+        serverUrl = 'http://localhost:3001';
+        console.log('🏠 Local development - connecting to:', serverUrl);
+      } else {
+        // Production fallback
+        serverUrl = 'https://space-legacy.onrender.com';
+        console.log('🌐 Production - connecting to:', serverUrl);
+      }
     } else {
-      // Production - connect to Render
-      serverUrl = 'https://space-legacy.onrender.com';
-      console.log('🌐 Production - connecting to:', serverUrl);
+      console.log('🔧 Using VITE_SERVER_URL from env:', serverUrl);
     }
 
-    console.log('🔧 VITE_SERVER_URL from env:', import.meta.env.VITE_SERVER_URL);
     console.log('✅ Final server URL:', serverUrl);
+    console.log('🌐 Current hostname:', window.location.hostname);
+    console.log('🔧 VITE_SERVER_URL env var:', import.meta.env.VITE_SERVER_URL || 'NOT SET');
 
     const newSocket = io(serverUrl, {
       autoConnect: true,
