@@ -22,21 +22,24 @@ const AdminPanel = ({ user, onUpdateSettings, onClose }) => {
 
   // Conectar al servidor para datos en tiempo real
   useEffect(() => {
-    // Detect the correct server URL based on current location
-    let serverUrl = `http://localhost:3001`;
+    // Use environment variable if available, otherwise determine based on hostname (same logic as useMultiplayer)
+    let serverUrl = import.meta.env.VITE_SERVER_URL;
 
-    // If we're running on a different port (like Vite's 5173), try to connect to the server
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      serverUrl = `http://${window.location.hostname}:3001`;
+    if (!serverUrl) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Local development - connect to server on port 3001
+        serverUrl = 'http://localhost:3001';
+        console.log('🏠 AdminPanel: Local development - connecting to:', serverUrl);
+      } else {
+        // Production fallback
+        serverUrl = 'https://space-legacy.onrender.com';
+        console.log('🌐 AdminPanel: Production - connecting to:', serverUrl);
+      }
+    } else {
+      console.log('🔧 AdminPanel: Using VITE_SERVER_URL from env:', serverUrl);
     }
 
-    // If the client is running on a port, try to connect to the server on the same host
-    if (window.location.port && window.location.port !== '3001') {
-      serverUrl = `http://${window.location.hostname}:3001`;
-      console.log('🔧 Cliente corriendo en puerto', window.location.port, '- intentando conectar a servidor en puerto 3001');
-    }
-
-    console.log('🔧 Intentando conectar panel de admin a:', serverUrl);
+    console.log('🔧 AdminPanel: Final server URL:', serverUrl);
 
     try {
       const adminSocket = io(serverUrl, {
