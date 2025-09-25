@@ -66,12 +66,22 @@ export const useMultiplayer = (currentUser = null) => {
   }, []);
 
   useEffect(() => {
-    // TEMPORARILY HARDCODED FOR TESTING - Replace with your Render URL
-    let serverUrl = 'https://space-legacy.onrender.com';
+    // For local development, connect to localhost:5173
+    // For production, connect to Render backend
+    let serverUrl;
+
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Local development
+      serverUrl = 'http://localhost:5173';
+      console.log('🏠 Local development - connecting to:', serverUrl);
+    } else {
+      // Production - connect to Render
+      serverUrl = 'https://space-legacy.onrender.com';
+      console.log('🌐 Production - connecting to:', serverUrl);
+    }
 
     console.log('🔧 VITE_SERVER_URL from env:', import.meta.env.VITE_SERVER_URL);
-    console.log('🌐 Current hostname:', window.location.hostname);
-    console.log('✅ Using hardcoded server URL:', serverUrl);
+    console.log('✅ Final server URL:', serverUrl);
 
     const newSocket = io(serverUrl, {
       autoConnect: true,
