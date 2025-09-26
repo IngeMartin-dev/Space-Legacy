@@ -641,12 +641,30 @@ export const useMultiplayer = (currentUser = null) => {
           inGame: false
         };
 
+        console.log('🏠 CREANDO SALA LOCAL - Estado antes:', { currentRoom, roomPlayers: roomPlayers.length });
+        console.log('🏠 SETTING LOCAL ROOM STATE:');
+        console.log('  - currentRoom:', localRoomCode);
+        console.log('  - roomPlayers:', [localPlayer]);
+        console.log('  - isHost:', true);
+
         setCurrentRoom(localRoomCode);
         setRoomPlayers([localPlayer]);
         setIsHost(true);
+
+        console.log('✅ LOCAL ROOM STATE SET');
         setError('Modo sin conexión - Solo para pruebas locales');
 
         console.log('✅ CLIENTE: Sala local creada:', localRoomCode, 'con jugador:', localPlayer.name);
+        console.log('📊 Estado después de crear sala local:', { currentRoom: localRoomCode, roomPlayers: [localPlayer], isHost: true });
+
+        // Forzar actualización inmediata del estado
+        setTimeout(() => {
+          console.log('🔄 Verificación de estado después de timeout:', {
+            currentRoom: localRoomCode,
+            roomPlayersLength: [localPlayer].length,
+            isHost: true
+          });
+        }, 100);
       } else {
         setError('No se puede crear sala: usuario no disponible');
       }
