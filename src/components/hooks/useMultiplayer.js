@@ -107,6 +107,7 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('connect', () => {
+      console.log('🔗 CLIENTE: Socket conectado exitosamente, ID:', newSocket.id);
       setIsConnected(true);
       setError('');
       setIsReconnecting(false);
@@ -114,6 +115,7 @@ export const useMultiplayer = (currentUser = null) => {
       // Send user info immediately after connection
       const sendUserInfo = (user) => {
         if (user && user.username) {
+          console.log('👤 CLIENTE: Enviando info de usuario:', user.username);
           newSocket.emit('userConnected', {
             username: user.username,
             avatar: user.avatar,
@@ -305,14 +307,19 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('playerJoined', (data) => {
+      console.log('🎯 CLIENTE: Recibido evento playerJoined:', data);
+      console.log('🔗 CLIENTE: Socket conectado?', newSocket.connected, 'ID:', newSocket.id);
       const eventTime = Date.now();
       const playersArray = Array.isArray(data.players) ? data.players : [];
+      console.log('👥 CLIENTE: Lista de jugadores actualizada:', playersArray.length, 'jugadores');
 
       // Update players list first
       setRoomPlayers(playersArray);
+      console.log('✅ CLIENTE: Estado roomPlayers actualizado');
 
       // Mostrar notificación de jugador que se unió (solo si no es el propio usuario)
       if (data.newPlayer?.id !== newSocket.id) {
+        console.log('🔔 CLIENTE: Mostrando notificación para nuevo jugador:', data.newPlayer?.name);
         const notificationData = {
           playerName: data.newPlayer?.name || 'Jugador',
           avatar: data.newPlayer?.avatar || '🎉',
@@ -321,6 +328,9 @@ export const useMultiplayer = (currentUser = null) => {
           reason: 'join'
         };
         setJoinNotification(notificationData);
+        console.log('✅ CLIENTE: Notificación de unión configurada');
+      } else {
+        console.log('🚫 CLIENTE: No mostrar notificación (es el propio usuario que se unió)');
       }
     });
 
