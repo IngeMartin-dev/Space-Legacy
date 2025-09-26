@@ -75,9 +75,12 @@ export const useMultiplayer = (currentUser = null) => {
         serverUrl = 'http://localhost:3001';
         console.log('🏠 Local development - connecting to:', serverUrl);
       } else {
-        // Production fallback
-        serverUrl = 'https://space-legacy.onrender.com';
-        console.log('🌐 Production - connecting to:', serverUrl);
+        // Production - require VITE_SERVER_URL to be set
+        console.error('❌ ERROR: VITE_SERVER_URL no está configurada para producción');
+        console.error('💡 Para usar multiplayer en Vercel, configura VITE_SERVER_URL con la URL de tu servidor backend');
+        console.log('🔧 Ejemplo: https://tu-servidor.onrender.com');
+        setError('Multiplayer no disponible: VITE_SERVER_URL no configurada en Vercel. Crea salas locales para probar la UI.');
+        // Don't return - allow local room creation even without server
       }
     } else {
       console.log('🔧 Using VITE_SERVER_URL from env:', serverUrl);
@@ -197,8 +200,15 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('connect_error', (err) => {
+      console.error('❌ CLIENTE: Error de conexión al servidor:', err.message);
       setIsConnected(false);
-      setError(`Error de conexión: ${err.message}. Verifica que el servidor esté ejecutándose en el puerto 3001.`);
+
+      // Provide better error messages based on the situation
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        setError('No se puede conectar al servidor multiplayer. Verifica que VITE_SERVER_URL esté configurada correctamente en Vercel.');
+      } else {
+        setError(`Error de conexión: ${err.message}. Verifica que el servidor esté ejecutándose en el puerto 3001.`);
+      }
     });
 
     newSocket.on('reconnect', (attemptNumber) => {
@@ -236,6 +246,7 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('roomCreated', (data) => {
+      console.log('🏠 CLIENTE: Sala creada exitosamente:', data.roomCode);
       setCurrentRoom(data.roomCode);
       const playersArray = Array.isArray(data.players) ? data.players : [];
 
@@ -250,6 +261,7 @@ export const useMultiplayer = (currentUser = null) => {
         inGame: player.inGame || false
       }));
 
+      console.log('👥 CLIENTE: Jugadores en sala creada:', processedPlayers.length);
       setRoomPlayers(processedPlayers);
       setIsHost(true);
       setError('');
@@ -611,21 +623,44 @@ export const useMultiplayer = (currentUser = null) => {
 
   const createRoom = useCallback((playerData) => {
     if (socket && socket.connected) {
+      console.log('🏠 CLIENTE: Enviando solicitud de crear sala al servidor');
       socket.emit('createRoom', playerData);
       setError('');
     } else {
-      setError('No conectado al servidor');
-      connect();
+      console.log('⚠️ CLIENTE: No hay conexión al servidor, creando sala local');
+      // Fallback: create room locally when no server connection
+      if (currentUser) {
+        const localRoomCode = 'LOCAL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const localPlayer = {
+          id: 'local-user-' + Date.now(),
+          name: currentUser.username,
+          avatar: currentUser.avatar || '👨‍🚀',
+          ship: currentUser.equippedShip || 'ship1',
+          equippedPet: null,
+          petLevels: {},
+          inGame: false
+        };
+
+        setCurrentRoom(localRoomCode);
+        setRoomPlayers([localPlayer]);
+        setIsHost(true);
+        setError('Modo sin conexión - Solo para pruebas locales');
+
+        console.log('✅ CLIENTE: Sala local creada:', localRoomCode, 'con jugador:', localPlayer.name);
+      } else {
+        setError('No se puede crear sala: usuario no disponible');
+      }
     }
-  }, [socket, connect]);
+  }, [socket, connect, currentUser]);
 
   const joinRoom = useCallback((roomCode, playerData) => {
     if (socket && socket.connected) {
+      console.log('🚪 CLIENTE: Enviando solicitud de unirse a sala:', roomCode);
       socket.emit('joinRoom', { roomCode: roomCode.toUpperCase(), playerData });
       setError('');
     } else {
-      setError('No conectado al servidor');
-      connect();
+      console.log('⚠️ CLIENTE: No hay conexión al servidor para unirse a sala');
+      setError('No se puede unir a salas multiplayer sin conexión al servidor. Configura VITE_SERVER_URL en Vercel.');
     }
   }, [socket, connect]);
 
