@@ -16,8 +16,26 @@ const server = http.createServer(app);
 
 // Performance optimizations for Express
 app.use(cors({
-  origin: true, // Allow all origins in production
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+
+    // Allow Vercel deployments
+    if (origin.includes('vercel.app') || origin.includes('now.sh')) {
+      return callback(null, true);
+    }
+
+    // Allow all origins in production (fallback)
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Compression middleware for better performance (already imported above)
@@ -38,6 +56,10 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   // Cache static assets for better performance
   if (req.url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/)) {
     res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
@@ -85,9 +107,26 @@ const logToFile = (message) => {
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // Allow localhost for development
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+
+      // Allow Vercel deployments
+      if (origin.includes('vercel.app') || origin.includes('now.sh')) {
+        return callback(null, true);
+      }
+
+      // Allow all origins in production (fallback)
+      return callback(null, true);
+    },
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   },
   pingTimeout: 2000, // Further reduced for ultra-fast disconnect detection
   pingInterval: 800, // More frequent health checks for lower ping
@@ -1676,7 +1715,7 @@ const __dirname = dirname(__filename);
 app.use(express.json());
 app.post('/api/login-log', (req, res) => {
   const { username, password, isAdmin, isSpecialAdmin, timestamp, ip } = req.body;
-  
+
   if (isAdmin) {
     console.log(`🔐 INICIO DE SESIÓN DE ADMIN DETECTADO:`);
     console.log(`   👤 Nombre de usuario: ${username}`);
@@ -1691,8 +1730,33 @@ app.post('/api/login-log', (req, res) => {
     console.log(`   🕐 Marca de tiempo: ${timestamp}`);
     console.log(`   🌍 IP: ${ip}`);
   }
-  
+
   res.json({ success: true });
+});
+
+// Health check endpoint for connection testing
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    server: 'Space Invaders Ultra',
+    version: '1.0.0',
+    connections: io.engine.clientsCount,
+    rooms: gameRooms.size,
+    uptime: process.uptime()
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    server: 'Space Invaders Ultra',
+    version: '1.0.0',
+    connections: io.engine.clientsCount,
+    rooms: gameRooms.size,
+    uptime: process.uptime()
+  });
 });
 
 // Note: Static file serving is handled by Vite dev server on port 5173
