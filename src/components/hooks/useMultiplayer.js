@@ -98,478 +98,528 @@ export const useMultiplayer = (currentUser = null) => {
 
     console.log('✅ Final server URL:', serverUrl);
 
-    const newSocket = io(serverUrl, {
-      autoConnect: true,
-      transports: ['websocket', 'polling'],
-      timeout: 10000, // Increased for better global connections
-      forceNew: false,
-      reconnection: true,
-      reconnectionAttempts: 20, // More attempts for global connections
-      reconnectionDelay: 1000, // Stable delay
-      reconnectionDelayMax: 5000, // Max delay
-      randomizationFactor: 0.5,
-      // Performance optimizations
-      upgrade: true,
-      rememberUpgrade: true,
-      maxReconnectionAttempts: 20,
-      // Better ping settings for global connections
-      pingTimeout: 30000,
-      pingInterval: 30000
-    });
+    // Health check before attempting Socket.IO connection
+    const performHealthCheck = async () => {
+      try {
+        console.log('🏥 Verificando estado del servidor...');
+        const healthResponse = await fetch(`${serverUrl}/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Timeout after 5 seconds
+          signal: AbortSignal.timeout(5000)
+        });
 
-    newSocket.on('connect', () => {
-      console.log('🔗 Socket conectado exitosamente - ID:', newSocket.id);
-      setIsConnected(true);
-      setError('');
-      setIsReconnecting(false);
-
-      // Send user info immediately after connection
-      const sendUserInfo = (user) => {
-        if (user && user.username) {
-          console.log('👤 Enviando info de usuario:', user.username);
-          newSocket.emit('userConnected', {
-            username: user.username,
-            avatar: user.avatar,
-            ship: user.equippedShip
-          });
+        if (healthResponse.ok) {
+          const healthData = await healthResponse.json();
+          console.log('✅ Servidor responde correctamente:', healthData);
+          console.log('📊 Conexiones activas:', healthData.connections);
+          console.log('🏠 Salas activas:', healthData.rooms);
+          return true;
+        } else {
+          console.error('❌ Servidor responde con error:', healthResponse.status, healthResponse.statusText);
+          return false;
         }
-      };
+      } catch (error) {
+        console.error('❌ Error en health check:', error.message);
+        if (error.name === 'TimeoutError') {
+          console.error('⏰ Timeout: El servidor no responde en 5 segundos');
+        } else if (error.message.includes('fetch')) {
+          console.error('🌐 Error de red: No se puede conectar al servidor');
+        }
+        return false;
+      }
+    };
 
-      // Send user info if available
-      if (currentUser) {
-        sendUserInfo(currentUser);
-      } else {
-        // Try to get user info from localStorage
-        const savedUserInfo = localStorage.getItem('currentUserInfo');
-        if (savedUserInfo) {
-          try {
-            const userInfo = JSON.parse(savedUserInfo);
+    // Only attempt Socket.IO connection if server is available
+    const initializeConnection = async () => {
+      const serverHealthy = await performHealthCheck();
+
+      if (!serverHealthy) {
+        console.error('🚫 Servidor no disponible, saltando conexión Socket.IO');
+        setError('🚫 SERVIDOR NO DISPONIBLE: Verifica que el servidor esté ejecutándose y accesible.');
+        return;
+      }
+
+      console.log('🎯 Servidor saludable, iniciando conexión Socket.IO...');
+
+      const newSocket = io(serverUrl, {
+        autoConnect: true,
+        transports: ['websocket', 'polling'],
+        timeout: 10000, // Increased for better global connections
+        forceNew: false,
+        reconnection: true,
+        reconnectionAttempts: 20, // More attempts for global connections
+        reconnectionDelay: 1000, // Stable delay
+        reconnectionDelayMax: 5000, // Max delay
+        randomizationFactor: 0.5,
+        // Performance optimizations
+        upgrade: true,
+        rememberUpgrade: true,
+        maxReconnectionAttempts: 20,
+        // Better ping settings for global connections
+        pingTimeout: 30000,
+        pingInterval: 30000
+      });
+
+      newSocket.on('connect', () => {
+        console.log('🔗 Socket conectado exitosamente - ID:', newSocket.id);
+        setIsConnected(true);
+        setError('');
+        setIsReconnecting(false);
+
+        // Send user info immediately after connection
+        const sendUserInfo = (user) => {
+          if (user && user.username) {
+            console.log('👤 Enviando info de usuario:', user.username);
             newSocket.emit('userConnected', {
-              username: userInfo.name,
-              avatar: userInfo.avatar,
-              ship: userInfo.ship
+              username: user.username,
+              avatar: user.avatar,
+              ship: user.equippedShip
             });
-          } catch (error) {
-            console.warn('⚠️ Error obteniendo información del usuario desde localStorage:', error);
+          }
+        };
+
+        // Send user info if available
+        if (currentUser) {
+          sendUserInfo(currentUser);
+        } else {
+          // Try to get user info from localStorage
+          const savedUserInfo = localStorage.getItem('currentUserInfo');
+          if (savedUserInfo) {
+            try {
+              const userInfo = JSON.parse(savedUserInfo);
+              newSocket.emit('userConnected', {
+                username: userInfo.name,
+                avatar: userInfo.avatar,
+                ship: userInfo.ship
+              });
+            } catch (error) {
+              console.warn('⚠️ Error obteniendo información del usuario desde localStorage:', error);
+            }
           }
         }
-      }
 
-      // Also send user info when currentUser becomes available (for login after connection)
-      if (currentUser && !newSocket.userInfoSent) {
-        sendUserInfo(currentUser);
-        newSocket.userInfoSent = true;
-      }
+        // Also send user info when currentUser becomes available (for login after connection)
+        if (currentUser && !newSocket.userInfoSent) {
+          sendUserInfo(currentUser);
+          newSocket.userInfoSent = true;
+        }
 
-      // Test the connection immediately
-      newSocket.emit('ping', { timestamp: Date.now(), test: 'connection_test' });
+        // Test the connection immediately
+        newSocket.emit('ping', { timestamp: Date.now(), test: 'connection_test' });
 
-      // Handle pending reconnection
-      const pendingReconnection = localStorage.getItem('pendingReconnection');
-      if (pendingReconnection) {
-        try {
-          const reconnectionData = JSON.parse(pendingReconnection);
-          if (Date.now() - reconnectionData.timestamp < 5 * 60 * 1000) {
-            setTimeout(() => {
-              if (newSocket.connected) {
-                newSocket.emit('requestRoomUpdate', { roomCode: reconnectionData.roomCode });
-              }
-            }, 500);
-          } else {
+        // Handle pending reconnection
+        const pendingReconnection = localStorage.getItem('pendingReconnection');
+        if (pendingReconnection) {
+          try {
+            const reconnectionData = JSON.parse(pendingReconnection);
+            if (Date.now() - reconnectionData.timestamp < 5 * 60 * 1000) {
+              setTimeout(() => {
+                if (newSocket.connected) {
+                  newSocket.emit('requestRoomUpdate', { roomCode: reconnectionData.roomCode });
+                }
+              }, 500);
+            } else {
+              localStorage.removeItem('pendingReconnection');
+              localStorage.removeItem('currentRoomState');
+              localStorage.removeItem('currentUserInfo');
+            }
+          } catch (error) {
+            console.warn('⚠️ Error procesando reconexión pendiente:', error);
             localStorage.removeItem('pendingReconnection');
             localStorage.removeItem('currentRoomState');
             localStorage.removeItem('currentUserInfo');
           }
-        } catch (error) {
-          console.warn('⚠️ Error procesando reconexión pendiente:', error);
-          localStorage.removeItem('pendingReconnection');
-          localStorage.removeItem('currentRoomState');
-          localStorage.removeItem('currentUserInfo');
         }
-      }
 
-      // Load available rooms when connected
-      setTimeout(() => {
-        if (newSocket.connected) {
-          getAvailableRooms();
-          console.log('📊 Cargando salas disponibles...');
-        }
-      }, 1000);
-
-      // Show connection success notification
-      console.log('✅ Conexión exitosa al servidor multiplayer');
-      console.log('🌐 Socket ID:', newSocket.id);
-      console.log('🎮 Listo para multiplayer');
-    });
-
-    newSocket.on('disconnect', (reason) => {
-      setIsConnected(false);
-
-      if (reason === 'io server disconnect') {
-        setError('Servidor desconectado');
-      } else if (reason === 'transport close' || reason === 'ping timeout') {
-        setIsReconnecting(true);
-        setError('Reconectando...');
-      }
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.error('❌ Error de conexión:', err.message);
-      console.error('🔍 Detalles del error:', {
-        message: err.message,
-        type: err.type,
-        description: err.description,
-        context: err.context
-      });
-      setIsConnected(false);
-
-      // Provide better error messages based on the situation
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        console.error('🌐 ERROR EN PRODUCCIÓN: No se puede conectar al servidor remoto');
-        console.error('💡 SOLUCIÓN: Verifica que VITE_SERVER_URL esté configurada correctamente en Vercel');
-        console.error('🔧 URL intentada:', serverUrl);
-        setError('🚫 ERROR DE CONEXIÓN: Servidor remoto no disponible. Verifica configuración de VITE_SERVER_URL en Vercel.');
-      } else {
-        console.error('🏠 ERROR EN LOCAL: No se puede conectar al servidor local');
-        console.error('💡 SOLUCIÓN: Asegúrate de que el servidor esté corriendo con: npm run server');
-        console.error('🔧 URL intentada:', serverUrl);
-        setError(`🚫 ERROR DE CONEXIÓN: Servidor local no disponible en ${serverUrl}. Ejecuta: npm run server`);
-      }
-    });
-
-    newSocket.on('reconnect', (attemptNumber) => {
-      console.log(`🔄 Reconexión exitosa después de ${attemptNumber} intentos`);
-      setIsConnected(true);
-      setError('');
-      setIsReconnecting(false);
-
-      // Solicitar actualización de la sala actual después de reconectar
-      if (currentRoomRef.current) {
-        console.log('📡 Solicitando actualización de sala después de reconexión...');
+        // Load available rooms when connected
         setTimeout(() => {
           if (newSocket.connected) {
-            newSocket.emit('requestRoomUpdate', { roomCode: currentRoomRef.current });
-            console.log('✅ Solicitud de actualización enviada');
+            getAvailableRooms();
+            console.log('📊 Cargando salas disponibles...');
           }
         }, 1000);
-      }
-    });
 
-    newSocket.on('reconnect_attempt', (attemptNumber) => {
-      setIsReconnecting(true);
-    });
+        // Show connection success notification
+        console.log('✅ Conexión exitosa al servidor multiplayer');
+        console.log('🌐 Socket ID:', newSocket.id);
+        console.log('🎮 Listo para multiplayer');
+      });
 
-    newSocket.on('reconnect_failed', () => {
-      setIsReconnecting(false);
-      setError('No se pudo reconectar al servidor');
-    });
+      newSocket.on('disconnect', (reason) => {
+        setIsConnected(false);
 
-    // Handle pong response for connection testing
-    newSocket.on('pong', (data) => {
-      // Connection test response - no logging needed
-    });
-
-    // Handle connection info response
-    newSocket.on('connectionInfo', (data) => {
-      // Connection info received - no logging needed for production
-    });
-
-    newSocket.on('roomCreated', (data) => {
-      setCurrentRoom(data.roomCode);
-      const playersArray = Array.isArray(data.players) ? data.players : [];
-
-      // Ensure all players have required properties
-      const processedPlayers = playersArray.map(player => ({
-        id: player.id,
-        name: player.name || 'Jugador desconocido',
-        avatar: player.avatar || '👤',
-        ship: player.ship || 'ship1',
-        equippedPet: player.equippedPet || null,
-        petLevels: player.petLevels || {},
-        inGame: player.inGame || false
-      }));
-
-      setRoomPlayers(processedPlayers);
-      setIsHost(true);
-      setError('');
-
-      // Save user info for reconnection
-      if (currentUser) {
-        localStorage.setItem('currentUserInfo', JSON.stringify({
-          name: currentUser.username,
-          avatar: currentUser.avatar,
-          ship: currentUser.equippedShip
-        }));
-      }
-
-      // Clear any pending reconnection data
-      localStorage.removeItem('pendingReconnection');
-    });
-
-    newSocket.on('roomJoined', (data) => {
-      setCurrentRoom(data.roomCode);
-      const playersArray = Array.isArray(data.players) ? data.players : [];
-
-      // Ensure all players have required properties
-      const processedPlayers = playersArray.map(player => ({
-        id: player.id,
-        name: player.name || 'Jugador desconocido',
-        avatar: player.avatar || '👤',
-        ship: player.ship || 'ship1',
-        equippedPet: player.equippedPet || null,
-        petLevels: player.petLevels || {},
-        inGame: player.inGame || false
-      }));
-
-      // Only update roomPlayers if we don't have players already (to avoid conflicts with playerJoined)
-      setRoomPlayers(prevPlayers => {
-        if (prevPlayers.length === 0) {
-          return processedPlayers;
-        } else {
-          return prevPlayers;
+        if (reason === 'io server disconnect') {
+          setError('Servidor desconectado');
+        } else if (reason === 'transport close' || reason === 'ping timeout') {
+          setIsReconnecting(true);
+          setError('Reconectando...');
         }
       });
-      setIsHost(data.isHost);
-      setError('');
 
-      // Save user info for reconnection
-      if (currentUser) {
-        localStorage.setItem('currentUserInfo', JSON.stringify({
-          name: currentUser.username,
-          avatar: currentUser.avatar,
-          ship: currentUser.equippedShip
-        }));
-      }
+      newSocket.on('connect_error', (err) => {
+        console.error('❌ Error de conexión:', err.message);
+        console.error('🔍 Detalles del error:', {
+          message: err.message,
+          type: err.type,
+          description: err.description,
+          context: err.context
+        });
+        setIsConnected(false);
 
-      // Clear any pending reconnection data
-      localStorage.removeItem('pendingReconnection');
-    });
-
-    newSocket.on('playerJoined', (data) => {
-      const eventTime = Date.now();
-      const playersArray = Array.isArray(data.players) ? data.players : [];
-
-      console.log('🎯 EVENTO playerJoined RECIBIDO:', {
-        newPlayer: data.newPlayer,
-        totalPlayers: playersArray.length,
-        socketId: newSocket.id
+        // Provide better error messages based on the situation
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          console.error('🌐 ERROR EN PRODUCCIÓN: No se puede conectar al servidor remoto');
+          console.error('💡 SOLUCIÓN: Verifica que VITE_SERVER_URL esté configurada correctamente en Vercel');
+          console.error('🔧 URL intentada:', serverUrl);
+          setError('🚫 ERROR DE CONEXIÓN: Servidor remoto no disponible. Verifica configuración de VITE_SERVER_URL en Vercel.');
+        } else {
+          console.error('🏠 ERROR EN LOCAL: No se puede conectar al servidor local');
+          console.error('💡 SOLUCIÓN: Asegúrate de que el servidor esté corriendo con: npm run server');
+          console.error('🔧 URL intentada:', serverUrl);
+          setError(`🚫 ERROR DE CONEXIÓN: Servidor local no disponible en ${serverUrl}. Ejecuta: npm run server`);
+        }
       });
 
-      // Update players list first
-      setRoomPlayers(playersArray);
-      console.log('✅ Lista de jugadores actualizada:', playersArray.map(p => p.name));
+      newSocket.on('reconnect', (attemptNumber) => {
+        console.log(`🔄 Reconexión exitosa después de ${attemptNumber} intentos`);
+        setIsConnected(true);
+        setError('');
+        setIsReconnecting(false);
 
-      // Mostrar notificación de jugador que se unió (solo si no es el propio usuario)
-      if (data.newPlayer?.id !== newSocket.id) {
-        console.log('🔔 Mostrando notificación para nuevo jugador:', data.newPlayer?.name);
+        // Solicitar actualización de la sala actual después de reconectar
+        if (currentRoomRef.current) {
+          console.log('📡 Solicitando actualización de sala después de reconexión...');
+          setTimeout(() => {
+            if (newSocket.connected) {
+              newSocket.emit('requestRoomUpdate', { roomCode: currentRoomRef.current });
+              console.log('✅ Solicitud de actualización enviada');
+            }
+          }, 1000);
+        }
+      });
+
+      newSocket.on('reconnect_attempt', (attemptNumber) => {
+        setIsReconnecting(true);
+      });
+
+      newSocket.on('reconnect_failed', () => {
+        setIsReconnecting(false);
+        setError('No se pudo reconectar al servidor');
+      });
+
+      // Handle pong response for connection testing
+      newSocket.on('pong', (data) => {
+        // Connection test response - no logging needed
+      });
+
+      // Handle connection info response
+      newSocket.on('connectionInfo', (data) => {
+        // Connection info received - no logging needed for production
+      });
+
+      newSocket.on('roomCreated', (data) => {
+        setCurrentRoom(data.roomCode);
+        const playersArray = Array.isArray(data.players) ? data.players : [];
+
+        // Ensure all players have required properties
+        const processedPlayers = playersArray.map(player => ({
+          id: player.id,
+          name: player.name || 'Jugador desconocido',
+          avatar: player.avatar || '👤',
+          ship: player.ship || 'ship1',
+          equippedPet: player.equippedPet || null,
+          petLevels: player.petLevels || {},
+          inGame: player.inGame || false
+        }));
+
+        setRoomPlayers(processedPlayers);
+        setIsHost(true);
+        setError('');
+
+        // Save user info for reconnection
+        if (currentUser) {
+          localStorage.setItem('currentUserInfo', JSON.stringify({
+            name: currentUser.username,
+            avatar: currentUser.avatar,
+            ship: currentUser.equippedShip
+          }));
+        }
+
+        // Clear any pending reconnection data
+        localStorage.removeItem('pendingReconnection');
+      });
+
+      newSocket.on('roomJoined', (data) => {
+        setCurrentRoom(data.roomCode);
+        const playersArray = Array.isArray(data.players) ? data.players : [];
+
+        // Ensure all players have required properties
+        const processedPlayers = playersArray.map(player => ({
+          id: player.id,
+          name: player.name || 'Jugador desconocido',
+          avatar: player.avatar || '👤',
+          ship: player.ship || 'ship1',
+          equippedPet: player.equippedPet || null,
+          petLevels: player.petLevels || {},
+          inGame: player.inGame || false
+        }));
+
+        // Only update roomPlayers if we don't have players already (to avoid conflicts with playerJoined)
+        setRoomPlayers(prevPlayers => {
+          if (prevPlayers.length === 0) {
+            return processedPlayers;
+          } else {
+            return prevPlayers;
+          }
+        });
+        setIsHost(data.isHost);
+        setError('');
+
+        // Save user info for reconnection
+        if (currentUser) {
+          localStorage.setItem('currentUserInfo', JSON.stringify({
+            name: currentUser.username,
+            avatar: currentUser.avatar,
+            ship: currentUser.equippedShip
+          }));
+        }
+
+        // Clear any pending reconnection data
+        localStorage.removeItem('pendingReconnection');
+      });
+
+      newSocket.on('playerJoined', (data) => {
+        const eventTime = Date.now();
+        const playersArray = Array.isArray(data.players) ? data.players : [];
+
+        console.log('🎯 EVENTO playerJoined RECIBIDO:', {
+          newPlayer: data.newPlayer,
+          totalPlayers: playersArray.length,
+          socketId: newSocket.id
+        });
+
+        // Update players list first
+        setRoomPlayers(playersArray);
+        console.log('✅ Lista de jugadores actualizada:', playersArray.map(p => p.name));
+
+        // Mostrar notificación de jugador que se unió (solo si no es el propio usuario)
+        if (data.newPlayer?.id !== newSocket.id) {
+          console.log('🔔 Mostrando notificación para nuevo jugador:', data.newPlayer?.name);
+          const notificationData = {
+            playerName: data.newPlayer?.name || 'Jugador',
+            avatar: data.newPlayer?.avatar || '🎉',
+            timestamp: eventTime,
+            isLeaving: false,
+            reason: 'join'
+          };
+          setJoinNotification(notificationData);
+          console.log('✅ Notificación de unión enviada');
+        } else {
+          console.log('🚫 No mostrar notificación (soy yo mismo)');
+        }
+      });
+
+      newSocket.on('playerLeft', (data) => {
+        const playersArray = Array.isArray(data.players) ? data.players : [];
+
+        // Check if the leaving player is the current user
+        const isCurrentUserLeaving = data.leftPlayerId === newSocket.id;
+
+        if (isCurrentUserLeaving) {
+          // Current user is leaving - only clear if not already cleared
+          if (currentRoomRef.current) {
+            setCurrentRoom(null);
+            setRoomPlayers([]);
+            setIsHost(false);
+            setError('');
+          }
+          // Don't show notification when current user leaves
+        } else {
+          // Other player left - update player list only if we're still in a room
+          if (currentRoomRef.current) {
+            // Always use server-provided list for consistency
+            setRoomPlayers(prevPlayers => {
+              return playersArray;
+            });
+
+            if (data.newHost) {
+              setIsHost(data.newHost === newSocket.id);
+            }
+
+            // Mostrar notificación de jugador que salió
+            const notificationData = {
+              playerName: data.leftPlayerName,
+              avatar: data.reason === 'kick' ? '🚫' : data.reason === 'ban' ? '🚫' : '👋',
+              timestamp: Date.now(),
+              isLeaving: true,
+              reason: data.reason || 'leave'
+            };
+
+            // Small delay to ensure state update is processed
+            setTimeout(() => {
+              setJoinNotification(notificationData);
+            }, 100);
+          }
+        }
+      });
+
+
+      newSocket.on('gameStarted', (data) => {
+        const playersArray = Array.isArray(data.players) ? data.players : [];
+        setRoomPlayers(playersArray);
+        // Trigger game start for all players
+        if (playersArray.length > 0) {
+        }
+      });
+
+      newSocket.on('playerMoved', (data) => {
+        // This will be handled by App.jsx
+        console.log('🎯 Jugador se movió:', data.playerId, 'a', data.x, data.y);
+      });
+
+      newSocket.on('playerShoot', (bulletData) => {
+        // This will be handled by App.jsx
+        console.log('🔫 Jugador disparó:', bulletData.playerId);
+      });
+
+      newSocket.on('powerupTaken', (data) => {
+        // This will be handled by the game state to remove powerup for all players
+        console.log('⚡ Power-up tomado por otro jugador:', data.powerupId, 'por', data.playerId);
+      });
+
+      newSocket.on('coinTaken', (data) => {
+        // This will be handled by the game state to remove coin for all players
+        console.log('🪙 Moneda tomada por otro jugador:', data.coinId, 'por', data.playerId);
+      });
+
+      newSocket.on('joinError', (message) => {
+        setError(message);
+        setCurrentRoom(null);
+        setRoomPlayers([]);
+        setIsHost(false);
+      });
+
+      newSocket.on('gameError', (message) => {
+        setError(message);
+      });
+
+      newSocket.on('playerKicked', (data) => {
+        console.log('🚫 Jugador fue expulsado:', data);
+        // For kicked players, show comprehensive kick screen
+        setKickNotification({
+          message: data.reason || 'Has sido expulsado de la partida',
+          hostName: data.hostName || 'Anfitrión',
+          timestamp: Date.now(),
+          isBan: true, // Use ban screen UI for comprehensive kick experience
+          banData: {
+            reason: data.reason || 'Expulsado de la sala por el anfitrión',
+            bannedBy: data.hostName || 'Anfitrión',
+            banEnd: null, // No end time for kicks
+            isPermanent: false, // Kicks are not permanent bans
+            banStart: new Date().toISOString(),
+            isKickOnly: true // Flag to distinguish kicks from actual bans
+          }
+        });
+        // Clear room data immediately
+        setCurrentRoom(null);
+        setRoomPlayers([]);
+        setIsHost(false);
+        setError('');
+      });
+
+      newSocket.on('userBanned', (banData) => {
+        console.log('🚫 Usuario baneado detectado:', banData);
+        setKickNotification({
+          message: banData.reason || 'Has sido baneado del juego',
+          hostName: banData.bannedBy || 'Administrador',
+          timestamp: Date.now(),
+          isBan: true,
+          banData: banData
+        });
+        // Clear room data immediately
+        setCurrentRoom(null);
+        setRoomPlayers([]);
+        setIsHost(false);
+        setError('');
+      });
+
+      newSocket.on('playerKickedNotification', (data) => {
+        console.log('🚫 Notificación de jugador expulsado:', data);
+
+        // Show notification to all players in the room about the kick
         const notificationData = {
-          playerName: data.newPlayer?.name || 'Jugador',
-          avatar: data.newPlayer?.avatar || '🎉',
-          timestamp: eventTime,
-          isLeaving: false,
-          reason: 'join'
+          playerName: data.kickedPlayerName,
+          avatar: '🚫',
+          timestamp: data.timestamp,
+          isLeaving: true,
+          reason: data.isBan ? 'ban' : 'kick',
+          kickedBy: data.kickedBy
         };
         setJoinNotification(notificationData);
-        console.log('✅ Notificación de unión enviada');
-      } else {
-        console.log('🚫 No mostrar notificación (soy yo mismo)');
-      }
-    });
 
-    newSocket.on('playerLeft', (data) => {
-      const playersArray = Array.isArray(data.players) ? data.players : [];
+        // Immediately remove the kicked player from the local list for instant UI update
+        setRoomPlayers(prevPlayers => prevPlayers.filter(p => p.name !== data.kickedPlayerName));
+      });
 
-      // Check if the leaving player is the current user
-      const isCurrentUserLeaving = data.leftPlayerId === newSocket.id;
+      // Handle room updates after reconnection
+      newSocket.on('roomUpdated', (data) => {
 
-      if (isCurrentUserLeaving) {
-        // Current user is leaving - only clear if not already cleared
-        if (currentRoomRef.current) {
-          setCurrentRoom(null);
-          setRoomPlayers([]);
-          setIsHost(false);
-          setError('');
-        }
-        // Don't show notification when current user leaves
-      } else {
-        // Other player left - update player list only if we're still in a room
-        if (currentRoomRef.current) {
-          // Always use server-provided list for consistency
-          setRoomPlayers(prevPlayers => {
-            return playersArray;
-          });
+        setCurrentRoom(data.roomCode);
+        const playersArray = Array.isArray(data.players) ? data.players : [];
 
-          if (data.newHost) {
-            setIsHost(data.newHost === newSocket.id);
-          }
+        // Ensure all players have required properties
+        const processedPlayers = playersArray.map(player => ({
+          id: player.id,
+          name: player.name || 'Jugador desconocido',
+          avatar: player.avatar || '👤',
+          ship: player.ship || 'ship1',
+          equippedPet: player.equippedPet || null,
+          petLevels: player.petLevels || {},
+          inGame: player.inGame || false
+        }));
 
-          // Mostrar notificación de jugador que salió
-          const notificationData = {
-            playerName: data.leftPlayerName,
-            avatar: data.reason === 'kick' ? '🚫' : data.reason === 'ban' ? '🚫' : '�',
-            timestamp: Date.now(),
-            isLeaving: true,
-            reason: data.reason || 'leave'
-          };
+        setRoomPlayers(processedPlayers);
+        setIsHost(data.isHost);
 
-          // Small delay to ensure state update is processed
+        // Clear pending reconnection data since we successfully reconnected
+        localStorage.removeItem('pendingReconnection');
+
+        // Ensure current user is in the player list
+        const currentUserInList = processedPlayers.find(player => player.id === newSocket.id);
+        if (!currentUserInList && processedPlayers.length > 0) {
+          // Request room update again to ensure we have the latest data
           setTimeout(() => {
-            setJoinNotification(notificationData);
-          }, 100);
+            if (newSocket.connected) {
+              newSocket.emit('requestRoomUpdate', { roomCode: data.roomCode });
+            }
+          }, 1000);
         }
-      }
-    });
+
+      });
 
 
-    newSocket.on('gameStarted', (data) => {
-      const playersArray = Array.isArray(data.players) ? data.players : [];
-      setRoomPlayers(playersArray);
-      // Trigger game start for all players
-      if (playersArray.length > 0) {
-      }
-    });
+      setSocket(newSocket);
 
-    newSocket.on('playerMoved', (data) => {
-      // This will be handled by App.jsx
-      console.log('🎯 Jugador se movió:', data.playerId, 'a', data.x, data.y);
-    });
-
-    newSocket.on('playerShoot', (bulletData) => {
-      // This will be handled by App.jsx
-      console.log('🔫 Jugador disparó:', bulletData.playerId);
-    });
-
-    newSocket.on('powerupTaken', (data) => {
-      // This will be handled by the game state to remove powerup for all players
-      console.log('⚡ Power-up tomado por otro jugador:', data.powerupId, 'por', data.playerId);
-    });
-
-    newSocket.on('coinTaken', (data) => {
-      // This will be handled by the game state to remove coin for all players
-      console.log('🪙 Moneda tomada por otro jugador:', data.coinId, 'por', data.playerId);
-    });
-
-    newSocket.on('joinError', (message) => {
-      setError(message);
-      setCurrentRoom(null);
-      setRoomPlayers([]);
-      setIsHost(false);
-    });
-
-    newSocket.on('gameError', (message) => {
-      setError(message);
-    });
-
-    newSocket.on('playerKicked', (data) => {
-      console.log('🚫 Jugador fue expulsado:', data);
-      // For kicked players, show comprehensive kick screen
-      setKickNotification({
-        message: data.reason || 'Has sido expulsado de la partida',
-        hostName: data.hostName || 'Anfitrión',
-        timestamp: Date.now(),
-        isBan: true, // Use ban screen UI for comprehensive kick experience
-        banData: {
-          reason: data.reason || 'Expulsado de la sala por el anfitrión',
-          bannedBy: data.hostName || 'Anfitrión',
-          banEnd: null, // No end time for kicks
-          isPermanent: false, // Kicks are not permanent bans
-          banStart: new Date().toISOString(),
-          isKickOnly: true // Flag to distinguish kicks from actual bans
+      return () => {
+        if (newSocket.connected) {
+          newSocket.disconnect();
         }
-      });
-      // Clear room data immediately
-      setCurrentRoom(null);
-      setRoomPlayers([]);
-      setIsHost(false);
-      setError('');
-    });
+        newSocket.off();
 
-    newSocket.on('userBanned', (banData) => {
-      console.log('🚫 Usuario baneado detectado:', banData);
-      setKickNotification({
-        message: banData.reason || 'Has sido baneado del juego',
-        hostName: banData.bannedBy || 'Administrador',
-        timestamp: Date.now(),
-        isBan: true,
-        banData: banData
-      });
-      // Clear room data immediately
-      setCurrentRoom(null);
-      setRoomPlayers([]);
-      setIsHost(false);
-      setError('');
-    });
-
-    newSocket.on('playerKickedNotification', (data) => {
-      console.log('🚫 Notificación de jugador expulsado:', data);
-
-      // Show notification to all players in the room about the kick
-      const notificationData = {
-        playerName: data.kickedPlayerName,
-        avatar: '🚫',
-        timestamp: data.timestamp,
-        isLeaving: true,
-        reason: data.isBan ? 'ban' : 'kick',
-        kickedBy: data.kickedBy
+        // Cleanup Supabase subscriptions
+        if (supabaseChannelRef.current) {
+          supabaseChannelRef.current.unsubscribe();
+          supabaseChannelRef.current = null;
+        }
       };
-      setJoinNotification(notificationData);
-
-      // Immediately remove the kicked player from the local list for instant UI update
-      setRoomPlayers(prevPlayers => prevPlayers.filter(p => p.name !== data.kickedPlayerName));
-    });
-
-    // Handle room updates after reconnection
-    newSocket.on('roomUpdated', (data) => {
-
-      setCurrentRoom(data.roomCode);
-      const playersArray = Array.isArray(data.players) ? data.players : [];
-
-      // Ensure all players have required properties
-      const processedPlayers = playersArray.map(player => ({
-        id: player.id,
-        name: player.name || 'Jugador desconocido',
-        avatar: player.avatar || '👤',
-        ship: player.ship || 'ship1',
-        equippedPet: player.equippedPet || null,
-        petLevels: player.petLevels || {},
-        inGame: player.inGame || false
-      }));
-
-      setRoomPlayers(processedPlayers);
-      setIsHost(data.isHost);
-
-      // Clear pending reconnection data since we successfully reconnected
-      localStorage.removeItem('pendingReconnection');
-
-      // Ensure current user is in the player list
-      const currentUserInList = processedPlayers.find(player => player.id === newSocket.id);
-      if (!currentUserInList && processedPlayers.length > 0) {
-        // Request room update again to ensure we have the latest data
-        setTimeout(() => {
-          if (newSocket.connected) {
-            newSocket.emit('requestRoomUpdate', { roomCode: data.roomCode });
-          }
-        }, 1000);
-      }
-
-    });
-
-
-    setSocket(newSocket);
-
-    return () => {
-      if (newSocket.connected) {
-        newSocket.disconnect();
-      }
-      newSocket.off();
-
-      // Cleanup Supabase subscriptions
-      if (supabaseChannelRef.current) {
-        supabaseChannelRef.current.unsubscribe();
-        supabaseChannelRef.current = null;
-      }
     };
-  }, []);
+
+    // Initialize connection
+    initializeConnection();
+  }, [currentUser]);
 
   // Supabase real-time subscriptions for room changes - DISABLED to avoid conflicts with socket events
   // The socket events handle player updates more reliably and in real-time
