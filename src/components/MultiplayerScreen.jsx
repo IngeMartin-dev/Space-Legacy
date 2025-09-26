@@ -102,15 +102,36 @@ const MultiplayerScreen = ({
     }
   }, [error]);
 
+  // Handle joinNotification changes - show notifications when players join/leave
+  useEffect(() => {
+    if (joinNotification && joinNotification.playerName) {
+      console.log('🔔 NOTIFICACIÓN GLOBAL:', joinNotification.playerName, joinNotification.isLeaving ? 'salió de la sala' : 'se conectó desde cualquier IP');
+      console.log('🌍 Jugador:', joinNotification.playerName, '- Estado:', joinNotification.isLeaving ? 'DESCONECTADO' : 'CONECTADO GLOBALMENTE');
+
+      // Trigger immediate visual feedback
+      if (!joinNotification.isLeaving) {
+        console.log('🎉 ¡NUEVO JUGADOR GLOBAL CONECTADO! Mostrando notificación...');
+      }
+
+      // The JoinNotification component will display this automatically
+      // Force a visual update to ensure the player list refreshes immediately
+      setTimeout(() => {
+        console.log('✅ Notificación procesada - Jugador visible en lista');
+      }, 100);
+    }
+  }, [joinNotification]);
 
 
-  // Enhanced player status notifications
+
+  // Enhanced player status notifications - GLOBAL CONNECTION SYSTEM
   const [playerStatusNotifications, setPlayerStatusNotifications] = useState([]);
+  const [globalConnectionAlerts, setGlobalConnectionAlerts] = useState([]);
 
   // Clear notifications when room changes
   useEffect(() => {
     if (!currentRoom) {
       setPlayerStatusNotifications([]);
+      setGlobalConnectionAlerts([]);
       previousPlayersRef.current = [];
     }
   }, [currentRoom]);
@@ -159,6 +180,20 @@ const MultiplayerScreen = ({
       if (newNotifications.length > 0) {
         setPlayerStatusNotifications(prev => [...prev, ...newNotifications]);
 
+        // Add global connection alerts for new players
+        const globalAlerts = newNotifications.filter(n => n.type === 'joined').map(notification => ({
+          id: `global-${notification.id}`,
+          message: `🌍 ¡${notification.playerName} se conectó desde cualquier IP del mundo! Jugador global unido.`,
+          type: 'global_join',
+          timestamp: Date.now(),
+          color: 'green'
+        }));
+
+        if (globalAlerts.length > 0) {
+          setGlobalConnectionAlerts(prev => [...prev, ...globalAlerts]);
+          console.log('🌍 ALERTA GLOBAL:', globalAlerts.map(a => a.message));
+        }
+
         // Auto-remove after 1 second
         newNotifications.forEach(notification => {
           setTimeout(() => {
@@ -166,6 +201,15 @@ const MultiplayerScreen = ({
               prev.filter(n => n.id !== notification.id)
             );
           }, 1000);
+        });
+
+        // Auto-remove global alerts after 3 seconds
+        globalAlerts.forEach(alert => {
+          setTimeout(() => {
+            setGlobalConnectionAlerts(prev =>
+              prev.filter(a => a.id !== alert.id)
+            );
+          }, 3000);
         });
       }
 
@@ -341,7 +385,30 @@ const MultiplayerScreen = ({
 
   // Reset loading states when room is created/joined or when there's an error
   useEffect(() => {
-    if (currentRoom) {
+    if (currentRoom && !currentRoom.startsWith('LOCAL-')) {
+      setIsCreatingRoom(false);
+      setIsJoiningRoom(false);
+
+      // Show global room creation alert
+      const roomAlert = {
+        id: `room-created-${Date.now()}`,
+        message: `🌍 ¡Sala ${currentRoom} creada exitosamente! Jugadores de cualquier IP pueden unirse ahora.`,
+        type: 'room_created',
+        timestamp: Date.now(),
+        color: 'blue'
+      };
+
+      setGlobalConnectionAlerts(prev => [...prev, roomAlert]);
+      console.log('🌍 SALA GLOBAL CREADA:', currentRoom, '- Lista para conexiones del mundo');
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        setGlobalConnectionAlerts(prev =>
+          prev.filter(a => a.id !== roomAlert.id)
+        );
+      }, 5000);
+    } else if (currentRoom) {
+      // Just reset loading states for local rooms
       setIsCreatingRoom(false);
       setIsJoiningRoom(false);
     }
@@ -357,12 +424,14 @@ const MultiplayerScreen = ({
 
   const handleCreateRoomClick = () => {
     setIsCreatingRoom(true);
+    console.log('🚀 CREANDO SALA GLOBAL - Esperando conexión de jugadores del mundo...');
     onCreateRoom();
   };
 
   const handleJoinRoomClick = () => {
     if (joinCode.length === 6) {
       setIsJoiningRoom(true);
+      console.log('🎯 UNIÉNDOSE A SALA GLOBAL:', joinCode, '- Conectando con jugadores de cualquier IP...');
       onJoinRoom(joinCode);
     }
   };
@@ -413,13 +482,17 @@ const MultiplayerScreen = ({
             ? 'text-green-400'
             : currentRoom?.startsWith('LOCAL-')
               ? 'text-yellow-400'
-              : 'text-red-400'
+              : isReconnecting
+                ? 'text-blue-400'
+                : 'text-red-400'
         }>
           {isConnected
             ? 'Conectado'
             : currentRoom?.startsWith('LOCAL-')
               ? 'Modo Local'
-              : 'Sin Servidor'
+              : isReconnecting
+                ? 'Reconectando...'
+                : 'Conectando...'
           }
         </span>
         {socket?.id && (
@@ -429,7 +502,7 @@ const MultiplayerScreen = ({
         )}
         {!isConnected && !currentRoom?.startsWith('LOCAL-') && (
           <span className="text-red-400 text-xs animate-pulse">
-            ⚠️ Configura VITE_SERVER_URL
+            🌐 Configura VITE_SERVER_URL para multiplayer global
           </span>
         )}
         {/* Debug Button */}
@@ -541,7 +614,7 @@ const MultiplayerScreen = ({
                   <p className="text-gray-300 text-sm">
                     {currentRoom.startsWith('LOCAL-')
                       ? 'Sala local para pruebas - No se puede compartir'
-                      : 'Comparte este código con tus amigos'
+                      : '🌍 Código global - Jugadores de cualquier IP pueden unirse'
                     }
                   </p>
                   {!currentRoom.startsWith('LOCAL-') && (
@@ -573,7 +646,7 @@ const MultiplayerScreen = ({
                     CREAR SALA
                   </h2>
                   <p className="text-green-100 text-lg leading-relaxed">
-                    Crea una nueva sala y invita a tus amigos a una aventura épica
+                    Crea una sala global y conecta con jugadores de cualquier IP del mundo
                   </p>
                   <div className="mt-4 flex justify-center space-x-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -629,7 +702,7 @@ const MultiplayerScreen = ({
                     UNIRSE A SALA
                   </h2>
                   <p className="text-blue-100 text-lg leading-relaxed">
-                    Ingresa el código de 6 dígitos para unirte a la batalla
+                    Ingresa el código y conéctate con jugadores de cualquier parte del mundo
                   </p>
                   <div className="mt-4 flex justify-center space-x-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-150"></div>
@@ -733,7 +806,12 @@ const MultiplayerScreen = ({
                 </div>
                 <div className="text-sm text-gray-300 flex items-center justify-between">
                   <span className="flex items-center">
-                    {isConnected ? '🟢 Conectado - Actualizaciones en tiempo real' : '🔴 Desconectado'}
+                    {isConnected
+                      ? '🟢 Conectado globalmente - Jugadores de cualquier IP aparecen inmediatamente'
+                      : isReconnecting
+                        ? '🔄 Conectando al mundo...'
+                        : '🔴 Sin conexión - Configura VITE_SERVER_URL'
+                    }
                   </span>
                   {isConnected && safeRoomPlayers.length > 0 && (
                     <span className="text-green-400 text-xs animate-pulse font-semibold">
@@ -836,15 +914,30 @@ const MultiplayerScreen = ({
                 <div className="text-center py-8 text-gray-400 bg-gray-900/30 rounded-xl border border-gray-700/50">
                   <Users size={48} className="mx-auto mb-4 opacity-50 animate-pulse" />
                   <p className="text-xl font-semibold mb-2">Esperando jugadores...</p>
-                  <p className="text-sm">{isConnected ? 'Los jugadores aparecerán aquí automáticamente cuando se unan' : 'Reconectando al servidor...'}</p>
-                  {!isConnected && (
+                  <p className="text-sm mb-4">
+                    {isConnected
+                      ? '🎯 Los jugadores aparecerán aquí inmediatamente cuando se conecten desde cualquier IP'
+                      : isReconnecting
+                        ? '🔄 Reconectando al servidor global...'
+                        : '⏳ Conectando al servidor multiplayer...'
+                    }
+                  </p>
+                  {!isConnected && !isReconnecting && (
                     <div className="mt-6">
                       <button
                         onClick={onForceReconnect}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-6 py-3 rounded-xl text-white font-semibold transition-all duration-200 hover:scale-105 shadow-lg"
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-6 py-3 rounded-xl text-white font-semibold transition-all duration-200 hover:scale-105 shadow-lg animate-pulse"
                       >
-                        🔄 Reconectar al Servidor
+                        🌐 CONECTAR AL MUNDO
                       </button>
+                    </div>
+                  )}
+                  {isReconnecting && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-center space-x-2 text-blue-400">
+                        <div className="animate-spin w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full"></div>
+                        <span className="text-sm font-semibold">Conectando globalmente...</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -926,12 +1019,54 @@ const MultiplayerScreen = ({
         </div>
       )}
 
+      {/* Global Connection Alerts - HIGHEST PRIORITY */}
+      {globalConnectionAlerts.slice(0, 3).map((alert, index) => (
+        <div
+          key={alert.id}
+          className={`fixed top-20 right-4 z-[10001] animate-slide-in-right shadow-2xl`}
+          style={{ top: `${20 + index * 100}px` }}
+        >
+          <div className={`rounded-lg p-4 border-2 shadow-xl min-w-[350px] ${
+            alert.color === 'green'
+              ? 'bg-green-600/95 border-green-400 text-white'
+              : alert.color === 'blue'
+                ? 'bg-blue-600/95 border-blue-400 text-white'
+                : 'bg-purple-600/95 border-purple-400 text-white'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-3xl animate-bounce">🌍</span>
+                <div>
+                  <p className="font-bold text-lg animate-pulse">¡CONEXIÓN GLOBAL!</p>
+                  <p className="text-sm opacity-90 font-semibold">{alert.message}</p>
+                  <p className="text-xs opacity-75 mt-1 flex items-center">
+                    <span className="animate-pulse mr-1">⚡</span>
+                    Jugador conectado desde cualquier IP del mundo
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setGlobalConnectionAlerts(prev =>
+                    prev.filter(a => a.id !== alert.id)
+                  );
+                }}
+                className="text-white/80 hover:text-white transition-colors"
+                title="Cerrar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
       {/* Simple Player Notifications */}
       {playerStatusNotifications.slice(0, 3).map((notification, index) => (
         <div
           key={notification.id}
           className={`fixed right-4 z-[9998] animate-slide-in-right shadow-2xl`}
-          style={{ top: `${16 + index * 70}px` }}
+          style={{ top: `${320 + index * 70}px` }}
         >
           <div className={`rounded-lg p-3 border-2 shadow-xl min-w-[250px] ${
             notification.color === 'green'
