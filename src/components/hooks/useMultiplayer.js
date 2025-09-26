@@ -74,16 +74,26 @@ export const useMultiplayer = (currentUser = null) => {
         // Local development - connect to server on port 3001
         serverUrl = 'http://localhost:3001';
         console.log('🏠 Local development - connecting to:', serverUrl);
+        console.log('💡 Asegúrate de que el servidor esté corriendo con: npm run server');
       } else {
         // Production - require VITE_SERVER_URL to be set
-        console.error('❌ ERROR: VITE_SERVER_URL no está configurada para producción');
-        console.error('💡 Para usar multiplayer en Vercel, configura VITE_SERVER_URL con la URL de tu servidor backend');
+        console.error('❌ ERROR CRÍTICO: VITE_SERVER_URL no está configurada para producción');
+        console.error('🌐 Hostname actual:', window.location.hostname);
+        console.error('💡 SOLUCIÓN: Configura VITE_SERVER_URL en Vercel con la URL de tu servidor backend');
         console.log('🔧 Ejemplo: https://tu-servidor.onrender.com');
-        setError('Multiplayer no disponible: VITE_SERVER_URL no configurada en Vercel. Crea salas locales para probar la UI.');
+        console.log('📋 PASOS PARA CONFIGURAR:');
+        console.log('   1. Despliega tu servidor backend (Railway, Render, etc.)');
+        console.log('   2. Copia la URL del servidor desplegado');
+        console.log('   3. Ve a Vercel > Tu proyecto > Settings > Environment Variables');
+        console.log('   4. Agrega: VITE_SERVER_URL = https://tu-servidor-desplegado.com');
+        console.log('   5. Redeploy el proyecto en Vercel');
+
+        setError('🚫 SERVIDOR NO CONFIGURADO: Multiplayer no disponible. Configura VITE_SERVER_URL en Vercel para habilitar conexiones globales.');
         // Don't return - allow local room creation even without server
       }
     } else {
       console.log('🔧 Using VITE_SERVER_URL from env:', serverUrl);
+      console.log('🌐 Intentando conectar a servidor remoto...');
     }
 
     console.log('✅ Final server URL:', serverUrl);
@@ -205,15 +215,25 @@ export const useMultiplayer = (currentUser = null) => {
 
     newSocket.on('connect_error', (err) => {
       console.error('❌ Error de conexión:', err.message);
+      console.error('🔍 Detalles del error:', {
+        message: err.message,
+        type: err.type,
+        description: err.description,
+        context: err.context
+      });
       setIsConnected(false);
 
       // Provide better error messages based on the situation
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        setError('Conectando al servidor multiplayer... Reintentando automáticamente.');
-        console.log('🌐 Intentando conectar a servidor remoto...');
+        console.error('🌐 ERROR EN PRODUCCIÓN: No se puede conectar al servidor remoto');
+        console.error('💡 SOLUCIÓN: Verifica que VITE_SERVER_URL esté configurada correctamente en Vercel');
+        console.error('🔧 URL intentada:', serverUrl);
+        setError('🚫 ERROR DE CONEXIÓN: Servidor remoto no disponible. Verifica configuración de VITE_SERVER_URL en Vercel.');
       } else {
-        setError(`Conectando al servidor local... Verifica que esté ejecutándose en el puerto 3001.`);
-        console.log('🏠 Intentando conectar a servidor local...');
+        console.error('🏠 ERROR EN LOCAL: No se puede conectar al servidor local');
+        console.error('💡 SOLUCIÓN: Asegúrate de que el servidor esté corriendo con: npm run server');
+        console.error('🔧 URL intentada:', serverUrl);
+        setError(`🚫 ERROR DE CONEXIÓN: Servidor local no disponible en ${serverUrl}. Ejecuta: npm run server`);
       }
     });
 
