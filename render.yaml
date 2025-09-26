@@ -7,8 +7,8 @@ services:
     startCommand: npm start
     envVars:
       - key: VITE_SUPABASE_URL
-        value: https://soubzhmklygqtefgqcll.supabase.co
+        value: https://ofzruqzlebaudousrnal.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvdWJ6aG1rbHlncXRlZmdxY2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3OTQ2NzQsImV4cCI6MjA3MDM3MDY3NH0.BIXlYUJ3XdhfN5P61D8ksnmnGcmKsl2Ir_1cUwDLRZg
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9menJ1cXpsZWJhdWRvdXNybmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NDA0MzgsImV4cCI6MjA3NDQxNjQzOH0.GBr1JhlOO6IoPHSN32jtuiudtyhDUtiQ2HBt2s6yx3o
       - key: NODE_ENV
         value: production
