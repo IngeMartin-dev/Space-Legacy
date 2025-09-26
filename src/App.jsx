@@ -642,12 +642,7 @@ function App() {
       ip: window.location.hostname
     };
 
-    // Send to server via fetch for logging
-    fetch('http://localhost:3000/api/login-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(loginData)
-    }).catch(() => {}); // Ignore errors, just for logging
+    // Login logging removed - server handles this internally if needed
 
     // Load game progress from Supabase
     let gameProgress = {};
