@@ -91,24 +91,24 @@ export const useMultiplayer = (currentUser = null) => {
     const newSocket = io(serverUrl, {
       autoConnect: true,
       transports: ['websocket', 'polling'],
-      timeout: 5000, // Reduced from 10000 for faster connections
+      timeout: 10000, // Increased for better global connections
       forceNew: false,
       reconnection: true,
-      reconnectionAttempts: 10, // Increased for better reliability
-      reconnectionDelay: 500, // Reduced from 1000 for faster reconnections
-      reconnectionDelayMax: 2000, // Reduced from 5000
-      randomizationFactor: 0.5, // Add randomization to prevent thundering herd
+      reconnectionAttempts: 20, // More attempts for global connections
+      reconnectionDelay: 1000, // Stable delay
+      reconnectionDelayMax: 5000, // Max delay
+      randomizationFactor: 0.5,
       // Performance optimizations
-      upgrade: true, // Allow upgrade to websocket
-      rememberUpgrade: true, // Remember successful upgrades
-      maxReconnectionAttempts: 10,
-      // Reduce ping frequency for better performance
-      pingTimeout: 20000,
-      pingInterval: 25000
+      upgrade: true,
+      rememberUpgrade: true,
+      maxReconnectionAttempts: 20,
+      // Better ping settings for global connections
+      pingTimeout: 30000,
+      pingInterval: 30000
     });
 
     newSocket.on('connect', () => {
-      console.log('🔗 Socket conectado exitosamente');
+      console.log('🔗 Socket conectado exitosamente - ID:', newSocket.id);
       setIsConnected(true);
       setError('');
       setIsReconnecting(false);
@@ -116,6 +116,7 @@ export const useMultiplayer = (currentUser = null) => {
       // Send user info immediately after connection
       const sendUserInfo = (user) => {
         if (user && user.username) {
+          console.log('👤 Enviando info de usuario:', user.username);
           newSocket.emit('userConnected', {
             username: user.username,
             avatar: user.avatar,
@@ -181,8 +182,14 @@ export const useMultiplayer = (currentUser = null) => {
       setTimeout(() => {
         if (newSocket.connected) {
           getAvailableRooms();
+          console.log('📊 Cargando salas disponibles...');
         }
       }, 1000);
+
+      // Show connection success notification
+      console.log('✅ Conexión exitosa al servidor multiplayer');
+      console.log('🌐 Socket ID:', newSocket.id);
+      console.log('🎮 Listo para multiplayer');
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -197,26 +204,32 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('connect_error', (err) => {
+      console.error('❌ Error de conexión:', err.message);
       setIsConnected(false);
 
       // Provide better error messages based on the situation
       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        setError('No se puede conectar al servidor multiplayer. Verifica que VITE_SERVER_URL esté configurada correctamente en Vercel.');
+        setError('Conectando al servidor multiplayer... Reintentando automáticamente.');
+        console.log('🌐 Intentando conectar a servidor remoto...');
       } else {
-        setError(`Error de conexión: ${err.message}. Verifica que el servidor esté ejecutándose en el puerto 3001.`);
+        setError(`Conectando al servidor local... Verifica que esté ejecutándose en el puerto 3001.`);
+        console.log('🏠 Intentando conectar a servidor local...');
       }
     });
 
     newSocket.on('reconnect', (attemptNumber) => {
+      console.log(`🔄 Reconexión exitosa después de ${attemptNumber} intentos`);
       setIsConnected(true);
       setError('');
       setIsReconnecting(false);
 
       // Solicitar actualización de la sala actual después de reconectar
       if (currentRoomRef.current) {
+        console.log('📡 Solicitando actualización de sala después de reconexión...');
         setTimeout(() => {
           if (newSocket.connected) {
             newSocket.emit('requestRoomUpdate', { roomCode: currentRoomRef.current });
+            console.log('✅ Solicitud de actualización enviada');
           }
         }, 1000);
       }
@@ -316,11 +329,19 @@ export const useMultiplayer = (currentUser = null) => {
       const eventTime = Date.now();
       const playersArray = Array.isArray(data.players) ? data.players : [];
 
+      console.log('🎯 EVENTO playerJoined RECIBIDO:', {
+        newPlayer: data.newPlayer,
+        totalPlayers: playersArray.length,
+        socketId: newSocket.id
+      });
+
       // Update players list first
       setRoomPlayers(playersArray);
+      console.log('✅ Lista de jugadores actualizada:', playersArray.map(p => p.name));
 
       // Mostrar notificación de jugador que se unió (solo si no es el propio usuario)
       if (data.newPlayer?.id !== newSocket.id) {
+        console.log('🔔 Mostrando notificación para nuevo jugador:', data.newPlayer?.name);
         const notificationData = {
           playerName: data.newPlayer?.name || 'Jugador',
           avatar: data.newPlayer?.avatar || '🎉',
@@ -329,6 +350,9 @@ export const useMultiplayer = (currentUser = null) => {
           reason: 'join'
         };
         setJoinNotification(notificationData);
+        console.log('✅ Notificación de unión enviada');
+      } else {
+        console.log('🚫 No mostrar notificación (soy yo mismo)');
       }
     });
 
@@ -625,12 +649,29 @@ export const useMultiplayer = (currentUser = null) => {
           inGame: false
         };
 
+        console.log('🏠 CREANDO SALA LOCAL - Estado inicial:', {
+          currentRoom: null,
+          roomPlayers: [],
+          isHost: false
+        });
+
         setCurrentRoom(localRoomCode);
         setRoomPlayers([localPlayer]);
         setIsHost(true);
-        setError('Modo sin conexión - Solo para pruebas locales');
+        setError('Modo Local - Sala creada exitosamente');
 
-        console.log('✅ Sala local creada:', localRoomCode, 'con jugador:', localPlayer.name);
+        console.log('✅ SALA LOCAL CREADA:', localRoomCode);
+        console.log('👤 Jugador local:', localPlayer.name);
+        console.log('📊 Estado final:', {
+          currentRoom: localRoomCode,
+          roomPlayers: [localPlayer],
+          isHost: true
+        });
+
+        // Mostrar notificación de que la sala local fue creada
+        setTimeout(() => {
+          console.log('🎉 Sala local lista para usar');
+        }, 500);
       } else {
         setError('No se puede crear sala: usuario no disponible');
       }
