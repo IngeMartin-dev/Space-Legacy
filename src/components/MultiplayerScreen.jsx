@@ -91,7 +91,6 @@ const MultiplayerScreen = ({
   const [joinCode, setJoinCode] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [gameStartCountdown, setGameStartCountdown] = useState(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const [showKickNotificationScreen, setShowKickNotificationScreen] = useState(false);
   const [kickNotificationData, setKickNotificationData] = useState(null);
   const [debugMode, setDebugMode] = useState(false);
@@ -128,12 +127,9 @@ const MultiplayerScreen = ({
   // Debug roomPlayers changes
   useEffect(() => {
     console.log('👥 MultiplayerScreen: roomPlayers cambió:', safeRoomPlayers.length, 'jugadores');
-    console.log('🔄 Force update triggered:', forceUpdate);
     if (safeRoomPlayers.length > 0) {
       console.log('📋 Lista actual de jugadores:', safeRoomPlayers.map(p => ({ name: p.name, id: p.id })));
     }
-    // Force re-render
-    setForceUpdate(prev => prev + 1);
   }, [roomPlayers]);
 
   // Enhanced player status notifications
@@ -414,10 +410,10 @@ const MultiplayerScreen = ({
 
 
 
-  console.log('🎨 RENDER: MultiplayerScreen - room:', currentRoom, 'players:', safeRoomPlayers.length, 'forceUpdate:', forceUpdate);
+  console.log('🎨 RENDER: MultiplayerScreen - room:', currentRoom, 'players:', safeRoomPlayers.length, 'isConnected:', isConnected);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white p-8 font-orbitron shadow-inset-2xl shadow-purple-900 relative overflow-hidden" key={`room-${currentRoom}-${safeRoomPlayers.length}-${forceUpdate}-${joinNotification?.timestamp || 'no-notification'}`}>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white p-8 font-orbitron shadow-inset-2xl shadow-purple-900 relative overflow-hidden">
       {/* Animated Background - Same as LoginScreen */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-transparent to-indigo-900/30"></div>
 
@@ -789,6 +785,7 @@ const MultiplayerScreen = ({
                 </div>
               </div>
 
+              {console.log('🎨 CHECKING PLAYER LIST CONDITION:', safeRoomPlayers.length > 0, 'safeRoomPlayers.length:', safeRoomPlayers.length)}
               {safeRoomPlayers.length > 0 ? (
                 <div key={playerListKey} className="space-y-2">
                   {console.log('🎨 RENDERING PLAYER LIST:', safeRoomPlayers.length, 'players')}
@@ -800,7 +797,7 @@ const MultiplayerScreen = ({
                       return levelB - levelA;
                     })
                     .map((player, index) => {
-                      console.log('🎨 RENDERING PLAYER:', player.name, player.id);
+                      console.log('🎨 RENDERING PLAYER:', player.name, player.id, 'index:', index);
                       const isTopPlayer = index < 3;
                       const rankColor = index === 0 ? 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50' :
                                        index === 1 ? 'from-gray-400/20 to-gray-500/20 border-gray-400/50' :
