@@ -125,6 +125,14 @@ const MultiplayerScreen = ({
     }
   }, [joinNotification]);
 
+  // Debug roomPlayers changes
+  useEffect(() => {
+    console.log('👥 MultiplayerScreen: roomPlayers cambió:', safeRoomPlayers.length, 'jugadores');
+    if (safeRoomPlayers.length > 0) {
+      console.log('📋 Lista actual de jugadores:', safeRoomPlayers.map(p => ({ name: p.name, id: p.id })));
+    }
+  }, [roomPlayers]);
+
   // Enhanced player status notifications
   const [playerStatusNotifications, setPlayerStatusNotifications] = useState([]);
 
