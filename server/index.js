@@ -816,7 +816,10 @@ io.on('connection', (socket) => {
         timestamp: eventTimestamp
       });
 
-      console.log(`✅ Evento playerJoined enviado a sala ${data.roomCode} at ${new Date(eventTimestamp).toISOString()}`);
+      console.log(`✅ SERVIDOR: Evento playerJoined enviado a sala ${data.roomCode}`);
+      console.log(`👥 SERVIDOR: Enviando lista de ${playersList.length} jugadores`);
+      console.log(`🆕 SERVIDOR: Nuevo jugador: ${player.name} (ID: ${player.id})`);
+      console.log(`📡 SERVIDOR: Evento enviado a ${io.sockets.adapter.rooms.get(data.roomCode)?.size || 0} conexiones en sala`);
       logToFile(`✅ Evento playerJoined enviado a sala ${data.roomCode} at ${new Date(eventTimestamp).toISOString()}`);
 
       const joinedPlayersList = room.getPlayersArray();
