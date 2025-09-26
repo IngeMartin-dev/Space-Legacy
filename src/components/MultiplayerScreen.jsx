@@ -128,9 +128,12 @@ const MultiplayerScreen = ({
   // Debug roomPlayers changes
   useEffect(() => {
     console.log('👥 MultiplayerScreen: roomPlayers cambió:', safeRoomPlayers.length, 'jugadores');
+    console.log('🔄 Force update triggered:', forceUpdate);
     if (safeRoomPlayers.length > 0) {
       console.log('📋 Lista actual de jugadores:', safeRoomPlayers.map(p => ({ name: p.name, id: p.id })));
     }
+    // Force re-render
+    setForceUpdate(prev => prev + 1);
   }, [roomPlayers]);
 
   // Enhanced player status notifications
@@ -411,6 +414,8 @@ const MultiplayerScreen = ({
 
 
 
+  console.log('🎨 RENDER: MultiplayerScreen - room:', currentRoom, 'players:', safeRoomPlayers.length, 'forceUpdate:', forceUpdate);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white p-8 font-orbitron shadow-inset-2xl shadow-purple-900 relative overflow-hidden" key={`room-${currentRoom}-${safeRoomPlayers.length}-${forceUpdate}-${joinNotification?.timestamp || 'no-notification'}`}>
       {/* Animated Background - Same as LoginScreen */}
@@ -442,13 +447,35 @@ const MultiplayerScreen = ({
 
       {/* Connection Status Indicator */}
       <div className="absolute top-8 right-32 flex items-center space-x-2 text-sm z-10">
-        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-        <span className={isConnected ? 'text-green-400' : 'text-red-400'}>
-          {isConnected ? 'Conectado' : 'Desconectado'}
+        <div className={`w-3 h-3 rounded-full ${
+          isConnected
+            ? 'bg-green-400 animate-pulse'
+            : currentRoom?.startsWith('LOCAL-')
+              ? 'bg-yellow-400 animate-pulse'
+              : 'bg-red-400'
+        }`}></div>
+        <span className={
+          isConnected
+            ? 'text-green-400'
+            : currentRoom?.startsWith('LOCAL-')
+              ? 'text-yellow-400'
+              : 'text-red-400'
+        }>
+          {isConnected
+            ? 'Conectado'
+            : currentRoom?.startsWith('LOCAL-')
+              ? 'Modo Local'
+              : 'Sin Servidor'
+          }
         </span>
         {socket?.id && (
           <span className="text-gray-400 text-xs">
             ID: {socket.id.substring(0, 8)}...
+          </span>
+        )}
+        {!isConnected && !currentRoom?.startsWith('LOCAL-') && (
+          <span className="text-red-400 text-xs animate-pulse">
+            ⚠️ Configura VITE_SERVER_URL
           </span>
         )}
         {/* Debug Button */}
@@ -548,13 +575,27 @@ const MultiplayerScreen = ({
           {currentRoom && (
             <>
               <div className="text-center mb-8">
-                <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent animate-glow">SALA: {currentRoom}</h1>
+                <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent animate-glow">
+                  SALA: {currentRoom}
+                  {currentRoom.startsWith('LOCAL-') && (
+                    <span className="block text-lg text-yellow-300 mt-2 animate-pulse">
+                      ⚠️ MODO LOCAL - Sin conexión al servidor
+                    </span>
+                  )}
+                </h1>
                 <div className="flex items-center justify-center space-x-2">
-                  <p className="text-gray-300 text-sm">Comparte este código con tus amigos</p>
-                  <CopyButton
-                    currentRoom={currentRoom}
-                    gameStartCountdown={gameStartCountdown}
-                  />
+                  <p className="text-gray-300 text-sm">
+                    {currentRoom.startsWith('LOCAL-')
+                      ? 'Sala local para pruebas - No se puede compartir'
+                      : 'Comparte este código con tus amigos'
+                    }
+                  </p>
+                  {!currentRoom.startsWith('LOCAL-') && (
+                    <CopyButton
+                      currentRoom={currentRoom}
+                      gameStartCountdown={gameStartCountdown}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -750,6 +791,7 @@ const MultiplayerScreen = ({
 
               {safeRoomPlayers.length > 0 ? (
                 <div key={playerListKey} className="space-y-2">
+                  {console.log('🎨 RENDERING PLAYER LIST:', safeRoomPlayers.length, 'players')}
                   {/* Ordenar jugadores por nivel (descendente) para ranking */}
                   {safeRoomPlayers
                     .sort((a, b) => {
@@ -758,6 +800,7 @@ const MultiplayerScreen = ({
                       return levelB - levelA;
                     })
                     .map((player, index) => {
+                      console.log('🎨 RENDERING PLAYER:', player.name, player.id);
                       const isTopPlayer = index < 3;
                       const rankColor = index === 0 ? 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50' :
                                        index === 1 ? 'from-gray-400/20 to-gray-500/20 border-gray-400/50' :
@@ -859,7 +902,7 @@ const MultiplayerScreen = ({
 
           {currentRoom && (
             <div className="mt-8 space-y-4">
-              {isHost && (
+              {isHost && !currentRoom.startsWith('LOCAL-') && (
                 <button
                   onClick={onStartGame}
                   disabled={safeRoomPlayers.length < 1 || gameStartCountdown !== null || safeRoomPlayers.some(p => p.inGame)}
@@ -872,6 +915,12 @@ const MultiplayerScreen = ({
                 >
                   {safeRoomPlayers.some(p => p.inGame) ? 'PARTIDA EN CURSO' : 'INICIAR PARTIDA'}
                 </button>
+              )}
+
+              {currentRoom.startsWith('LOCAL-') && (
+                <div className="w-full py-3 rounded-lg font-semibold text-center bg-yellow-600/20 border border-yellow-500/50 text-yellow-300">
+                  🎮 Modo Local - Inicia el juego desde el menú principal para jugar solo
+                </div>
               )}
             </div>
           )}
