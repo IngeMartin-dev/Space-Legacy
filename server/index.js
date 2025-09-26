@@ -1818,13 +1818,25 @@ const cleanupExpiredBans = async () => {
         .select();
 
       if (error) {
-        console.error('❌ Error cleaning up expired bans:', error);
+        // Solo loggear errores de red, no fallar completamente
+        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+          console.warn('⚠️ Network error during ban cleanup (continuing normally):', error.message);
+        } else {
+          console.error('❌ Error cleaning up expired bans:', error);
+        }
       } else if (expiredBans && expiredBans.length > 0) {
         console.log(`🧹 Cleanup completed: ${expiredBans.length} expired bans deactivated`);
+      } else {
+        console.log('🧹 Ban cleanup completed: no expired bans found');
       }
     }
   } catch (error) {
-    console.error('❌ Error in cleanupExpiredBans:', error);
+    // Manejar errores de red gracefully sin detener el servidor
+    if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('TypeError: fetch failed')) {
+      console.warn('⚠️ Network connectivity issue during ban cleanup (continuing normally):', error.message);
+    } else {
+      console.error('❌ Unexpected error in cleanupExpiredBans:', error);
+    }
   }
 };
 
