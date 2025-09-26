@@ -1,10 +1,4 @@
 // START OF FILE MultiplayerScreen.jsx
-// ===========================================
-// IMPORTANTE: NO BORRAR LA FUNCIONALIDAD DE LISTA DE JUGADORES
-// Esta pantalla incluye un sistema automático que muestra los jugadores
-// en la sala cuando se unen. Las actualizaciones son instantáneas.
-// Busca la sección "LISTA DE JUGADORES - NO BORRAR ESTA SECCIÓN"
-// ===========================================
 import React, { useState, useRef, useEffect } from 'react';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { ArrowLeft, Users, Plus, UserPlus, MessageCircle, LogOut, XCircle, Send, X } from 'lucide-react';
@@ -77,16 +71,10 @@ const MultiplayerScreen = ({
   kickNotification,
   clearKickNotification
 }) => {
-  // Debug logging removed to prevent performance issues
-
   // Ensure roomPlayers is always an array
   const safeRoomPlayers = Array.isArray(roomPlayers) ? roomPlayers : [];
 
-  // Debug logging removed to prevent infinite loops
 
-
-  // SISTEMA AUTOMÁTICO DE ACTUALIZACIÓN ACTIVADO
-  // Los jugadores se muestran instantáneamente sin necesidad de botones
 
   const [joinCode, setJoinCode] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
@@ -114,23 +102,7 @@ const MultiplayerScreen = ({
     }
   }, [error]);
 
-  // Handle joinNotification changes
-  useEffect(() => {
-    if (joinNotification) {
-      console.log('🎯 MultiplayerScreen: Received joinNotification:', joinNotification);
-      // All notifications are now small notifications, no full-screen for kicks
-      console.log('📢 All notifications are small, forcing re-render');
-      setForceUpdate(prev => prev + 1);
-    }
-  }, [joinNotification]);
 
-  // Debug roomPlayers changes
-  useEffect(() => {
-    console.log('👥 MultiplayerScreen: roomPlayers cambió:', safeRoomPlayers.length, 'jugadores');
-    if (safeRoomPlayers.length > 0) {
-      console.log('📋 Lista actual de jugadores:', safeRoomPlayers.map(p => ({ name: p.name, id: p.id })));
-    }
-  }, [roomPlayers]);
 
   // Enhanced player status notifications
   const [playerStatusNotifications, setPlayerStatusNotifications] = useState([]);
@@ -201,9 +173,7 @@ const MultiplayerScreen = ({
     }
   }, [roomPlayers, currentRoom]);
 
-  // Debug notification system (removed console logs for performance)
 
-  // Monitor roomPlayers changes (removed console logs for performance)
 
 
 
@@ -354,16 +324,9 @@ const MultiplayerScreen = ({
     };
   }, [socket, onLeaveRoom]);
 
-  // Ensure instant re-renders when roomPlayers updates
-  useEffect(() => {
-    // Force a re-render by updating a dummy state when roomPlayers changes
-    // This ensures the UI updates immediately with the latest player data
-    setForceUpdate(prev => prev + 1);
-  }, [roomPlayers, currentRoom, isConnected]);
 
 
 
-  // Debug component re-rendering (removed console log for performance)
 
   // Generate stable key for player list
   const playerListKey = `players-${safeRoomPlayers.map(p => p.id).join('-')}-${Date.now()}`;
@@ -390,10 +353,6 @@ const MultiplayerScreen = ({
       setIsJoiningRoom(false);
     }
   }, [error]);
-  // AUTOMATIC INSTANT UPDATES - No interference with future code changes
-  // This system automatically updates the player list when players join/leave
-  // The useMultiplayer hook handles real-time socket events
-  // No buttons or manual triggers needed - everything is automatic
 
 
   const handleCreateRoomClick = () => {
@@ -410,7 +369,6 @@ const MultiplayerScreen = ({
 
 
 
-  console.log('🎨 RENDER: MultiplayerScreen - room:', currentRoom, 'players:', safeRoomPlayers.length, 'isConnected:', isConnected);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 text-white p-8 font-orbitron shadow-inset-2xl shadow-purple-900 relative overflow-hidden">
@@ -765,7 +723,7 @@ const MultiplayerScreen = ({
                 </div>
               )}
 
-              {/* LISTA DE JUGADORES - SECCIÓN COMPLETA CON FUNCIONALIDAD DE EXPULSIÓN */}
+              {/* LISTA DE JUGADORES */}
               <div className="mb-4 p-4 bg-gradient-to-r from-blue-900/40 to-purple-900/40 rounded-xl border border-blue-500/50 shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xl font-bold text-blue-300 flex items-center">
@@ -785,10 +743,8 @@ const MultiplayerScreen = ({
                 </div>
               </div>
 
-              {console.log('🎨 CHECKING PLAYER LIST CONDITION:', safeRoomPlayers.length > 0, 'safeRoomPlayers.length:', safeRoomPlayers.length)}
               {safeRoomPlayers.length > 0 ? (
                 <div key={playerListKey} className="space-y-2">
-                  {console.log('🎨 RENDERING PLAYER LIST:', safeRoomPlayers.length, 'players')}
                   {/* Ordenar jugadores por nivel (descendente) para ranking */}
                   {safeRoomPlayers
                     .sort((a, b) => {
@@ -797,7 +753,6 @@ const MultiplayerScreen = ({
                       return levelB - levelA;
                     })
                     .map((player, index) => {
-                      console.log('🎨 RENDERING PLAYER:', player.name, player.id, 'index:', index);
                       const isTopPlayer = index < 3;
                       const rankColor = index === 0 ? 'from-yellow-500/20 to-yellow-600/20 border-yellow-400/50' :
                                        index === 1 ? 'from-gray-400/20 to-gray-500/20 border-gray-400/50' :
@@ -809,7 +764,7 @@ const MultiplayerScreen = ({
 
                       return (
                         <div
-                          key={`player-${player?.id || `fallback-${index}`}-${player?.name || 'unknown'}-${forceUpdate}`}
+                          key={`player-${player?.id || `fallback-${index}`}-${player?.name || 'unknown'}-${Date.now()}`}
                           className={`flex items-center justify-between rounded-xl p-4 border transition-all duration-300 shadow-lg ${
                             isTopPlayer
                               ? `bg-gradient-to-r ${rankColor} hover:scale-[1.02] shadow-xl`
@@ -1094,10 +1049,3 @@ const MultiplayerScreen = ({
 
 export default MultiplayerScreen;
 // END OF FILE MultiplayerScreen.jsx
-// ===========================================
-// RECORDATORIO: PRESERVAR LA FUNCIONALIDAD DE LISTA DE JUGADORES
-// Si actualizas este archivo, asegúrate de mantener:
-// 1. La sección "LISTA DE JUGADORES - NO BORRAR ESTA SECCIÓN"
-// 2. Los useEffect que manejan las actualizaciones automáticas
-// 3. La integración con useMultiplayer hook
-// ===========================================
