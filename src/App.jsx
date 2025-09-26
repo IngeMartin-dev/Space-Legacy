@@ -249,22 +249,6 @@ function App() {
   useEffect(() => { if (currentUser && !isConnected) connect(); }, [currentUser, isConnected, connect]);
 
 
-  // Debug: Monitor roomPlayers changes from useMultiplayer hook
-  useEffect(() => {
-    console.log('🔄 App.jsx: roomPlayers cambió desde useMultiplayer:', roomPlayers);
-    console.log('🔄 App.jsx: roomPlayers.length:', roomPlayers.length);
-    console.log('🔄 App.jsx: roomPlayers type:', typeof roomPlayers);
-    console.log('🔄 App.jsx: Array.isArray(roomPlayers):', Array.isArray(roomPlayers));
-    console.log('🔄 App.jsx: currentRoom:', currentRoom);
-    console.log('🔄 App.jsx: isConnected:', isConnected);
-    console.log('🔄 App.jsx: currentScreen:', currentScreen);
-
-    // Force re-render when roomPlayers changes
-    if (roomPlayers && roomPlayers.length > 0) {
-      console.log('🔄 App.jsx: Forzando re-render por cambio en roomPlayers');
-      setCurrentScreen(prev => prev); // Force re-render
-    }
-  }, [roomPlayers, currentRoom, isConnected, currentScreen]);
 
   // Handle expulsion screen navigation
   useEffect(() => {
@@ -1024,12 +1008,6 @@ function App() {
   if (currentScreen === 'localMultiplayer') return <LocalMultiplayerSetup onBack={() => setCurrentScreen('start')} onStartGame={handleStartLocalMultiplayer} user={currentUser} controls={controls} />;
 
   if (currentScreen === 'multiplayer') {
-    console.log('🎮 App.jsx: RENDERING MULTIPLAYER SCREEN');
-    console.log('🎮 App.jsx: currentScreen =', currentScreen);
-    console.log('🎮 App.jsx: isConnected =', isConnected);
-    console.log('🎮 App.jsx: currentRoom =', currentRoom);
-    console.log('🎮 App.jsx: roomPlayers =', roomPlayers);
-    console.log('🎮 App.jsx: roomPlayers.length =', roomPlayers.length);
     return (
       <>
         <MultiplayerScreen
@@ -1150,11 +1128,11 @@ function App() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white font-orbitron p-8 animate-slide-in">
         <h1 className="text-6xl font-bold mb-8 text-red-400 animate-glow">GAME OVER</h1>
         <div className="text-center mb-8 bg-black/30 p-6 rounded-lg border border-red-700 shadow-xl shadow-red-900/40 max-w-2xl">
-          <p className="text-2xl mb-2">Puntuación Final Total: </p>
-          <p className="text-xl mb-2">Monedas de Puntuación: </p>
-          <p className="text-xl mb-2">Monedas Recolectadas: </p>
-          <p className="text-2xl mb-4 font-bold">Total Monedas Ganadas: </p>
-          <p className="text-xl mb-6">Nivel Alcanzado: </p>
+          <p className="text-2xl mb-2">Puntuación Final Total: <span className="text-yellow-400">{totalScore.toLocaleString()}</span></p>
+          <p className="text-xl mb-2">Monedas de Puntuación: <span className="text-green-400">{scoreBasedCoins.toLocaleString()}</span> <span className="text-gray-400 text-sm">({totalScore} × 2 ÷ 1.5)</span></p>
+          <p className="text-xl mb-2">Monedas Recolectadas: <span className="text-blue-400">{totalCoinsEarned.toLocaleString()}</span></p>
+          <p className="text-2xl mb-4 font-bold">Total Monedas Ganadas: <span className="text-yellow-300">{totalCoinsAdded.toLocaleString()}</span></p>
+          <p className="text-xl mb-6">Nivel Alcanzado: <span className="text-blue-400">{gameState.level}</span></p>
           <h3 className="text-lg font-bold mb-2">Puntuaciones Individuales:</h3>
           {players.map(p => <p key={p.id}>{p.name}: <span className="text-yellow-300">{(p.score || 0).toLocaleString()}</span></p>)}
         </div>
