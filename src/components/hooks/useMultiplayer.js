@@ -87,8 +87,6 @@ export const useMultiplayer = (currentUser = null) => {
     }
 
     console.log('✅ Final server URL:', serverUrl);
-    console.log('🌐 Current hostname:', window.location.hostname);
-    console.log('🔧 VITE_SERVER_URL env var:', import.meta.env.VITE_SERVER_URL || 'NOT SET');
 
     const newSocket = io(serverUrl, {
       autoConnect: true,
@@ -110,7 +108,7 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('connect', () => {
-      console.log('🔗 CLIENTE: Socket conectado exitosamente, ID:', newSocket.id);
+      console.log('🔗 Socket conectado exitosamente');
       setIsConnected(true);
       setError('');
       setIsReconnecting(false);
@@ -118,7 +116,6 @@ export const useMultiplayer = (currentUser = null) => {
       // Send user info immediately after connection
       const sendUserInfo = (user) => {
         if (user && user.username) {
-          console.log('👤 CLIENTE: Enviando info de usuario:', user.username);
           newSocket.emit('userConnected', {
             username: user.username,
             avatar: user.avatar,
@@ -200,7 +197,6 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('connect_error', (err) => {
-      console.error('❌ CLIENTE: Error de conexión al servidor:', err.message);
       setIsConnected(false);
 
       // Provide better error messages based on the situation
@@ -246,7 +242,6 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('roomCreated', (data) => {
-      console.log('🏠 CLIENTE: Sala creada exitosamente:', data.roomCode);
       setCurrentRoom(data.roomCode);
       const playersArray = Array.isArray(data.players) ? data.players : [];
 
@@ -261,7 +256,6 @@ export const useMultiplayer = (currentUser = null) => {
         inGame: player.inGame || false
       }));
 
-      console.log('👥 CLIENTE: Jugadores en sala creada:', processedPlayers.length);
       setRoomPlayers(processedPlayers);
       setIsHost(true);
       setError('');
@@ -319,19 +313,14 @@ export const useMultiplayer = (currentUser = null) => {
     });
 
     newSocket.on('playerJoined', (data) => {
-      console.log('🎯 CLIENTE: Recibido evento playerJoined:', data);
-      console.log('🔗 CLIENTE: Socket conectado?', newSocket.connected, 'ID:', newSocket.id);
       const eventTime = Date.now();
       const playersArray = Array.isArray(data.players) ? data.players : [];
-      console.log('👥 CLIENTE: Lista de jugadores actualizada:', playersArray.length, 'jugadores');
 
       // Update players list first
       setRoomPlayers(playersArray);
-      console.log('✅ CLIENTE: Estado roomPlayers actualizado');
 
       // Mostrar notificación de jugador que se unió (solo si no es el propio usuario)
       if (data.newPlayer?.id !== newSocket.id) {
-        console.log('🔔 CLIENTE: Mostrando notificación para nuevo jugador:', data.newPlayer?.name);
         const notificationData = {
           playerName: data.newPlayer?.name || 'Jugador',
           avatar: data.newPlayer?.avatar || '🎉',
@@ -340,9 +329,6 @@ export const useMultiplayer = (currentUser = null) => {
           reason: 'join'
         };
         setJoinNotification(notificationData);
-        console.log('✅ CLIENTE: Notificación de unión configurada');
-      } else {
-        console.log('🚫 CLIENTE: No mostrar notificación (es el propio usuario que se unió)');
       }
     });
 
@@ -623,11 +609,9 @@ export const useMultiplayer = (currentUser = null) => {
 
   const createRoom = useCallback((playerData) => {
     if (socket && socket.connected) {
-      console.log('🏠 CLIENTE: Enviando solicitud de crear sala al servidor');
       socket.emit('createRoom', playerData);
       setError('');
     } else {
-      console.log('⚠️ CLIENTE: No hay conexión al servidor, creando sala local');
       // Fallback: create room locally when no server connection
       if (currentUser) {
         const localRoomCode = 'LOCAL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -641,30 +625,12 @@ export const useMultiplayer = (currentUser = null) => {
           inGame: false
         };
 
-        console.log('🏠 CREANDO SALA LOCAL - Estado antes:', { currentRoom, roomPlayers: roomPlayers.length });
-        console.log('🏠 SETTING LOCAL ROOM STATE:');
-        console.log('  - currentRoom:', localRoomCode);
-        console.log('  - roomPlayers:', [localPlayer]);
-        console.log('  - isHost:', true);
-
         setCurrentRoom(localRoomCode);
         setRoomPlayers([localPlayer]);
         setIsHost(true);
-
-        console.log('✅ LOCAL ROOM STATE SET');
         setError('Modo sin conexión - Solo para pruebas locales');
 
-        console.log('✅ CLIENTE: Sala local creada:', localRoomCode, 'con jugador:', localPlayer.name);
-        console.log('📊 Estado después de crear sala local:', { currentRoom: localRoomCode, roomPlayers: [localPlayer], isHost: true });
-
-        // Forzar actualización inmediata del estado
-        setTimeout(() => {
-          console.log('🔄 Verificación de estado después de timeout:', {
-            currentRoom: localRoomCode,
-            roomPlayersLength: [localPlayer].length,
-            isHost: true
-          });
-        }, 100);
+        console.log('✅ Sala local creada:', localRoomCode, 'con jugador:', localPlayer.name);
       } else {
         setError('No se puede crear sala: usuario no disponible');
       }
@@ -673,11 +639,9 @@ export const useMultiplayer = (currentUser = null) => {
 
   const joinRoom = useCallback((roomCode, playerData) => {
     if (socket && socket.connected) {
-      console.log('🚪 CLIENTE: Enviando solicitud de unirse a sala:', roomCode);
       socket.emit('joinRoom', { roomCode: roomCode.toUpperCase(), playerData });
       setError('');
     } else {
-      console.log('⚠️ CLIENTE: No hay conexión al servidor para unirse a sala');
       setError('No se puede unir a salas multiplayer sin conexión al servidor. Configura VITE_SERVER_URL en Vercel.');
     }
   }, [socket, connect]);
@@ -696,6 +660,13 @@ export const useMultiplayer = (currentUser = null) => {
         supabaseChannelRef.current.unsubscribe();
         supabaseChannelRef.current = null;
       }
+    } else {
+      // Also clear local room state
+      setCurrentRoom(null);
+      setRoomPlayers([]);
+      setIsHost(false);
+      setError('');
+      setKickNotification(null);
     }
   }, [socket, currentRoom]);
 
