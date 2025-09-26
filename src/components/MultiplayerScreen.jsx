@@ -501,9 +501,15 @@ const MultiplayerScreen = ({
           </span>
         )}
         {!isConnected && !currentRoom?.startsWith('LOCAL-') && (
-          <span className="text-red-400 text-xs animate-pulse">
-            🌐 Configura VITE_SERVER_URL para multiplayer global
-          </span>
+          <div className="text-red-400 text-xs animate-pulse flex flex-col">
+            <span>🚫 SERVIDOR NO DISPONIBLE</span>
+            <span className="text-gray-400">
+              {window.location.hostname === 'localhost'
+                ? 'Ejecuta: npm run server'
+                : 'Configura VITE_SERVER_URL en Vercel'
+              }
+            </span>
+          </div>
         )}
         {/* Debug Button */}
         <button
@@ -923,13 +929,35 @@ const MultiplayerScreen = ({
                     }
                   </p>
                   {!isConnected && !isReconnecting && (
-                    <div className="mt-6">
-                      <button
-                        onClick={onForceReconnect}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-6 py-3 rounded-xl text-white font-semibold transition-all duration-200 hover:scale-105 shadow-lg animate-pulse"
-                      >
-                        🌐 CONECTAR AL MUNDO
-                      </button>
+                    <div className="mt-6 space-y-3">
+                      <div className="text-center">
+                        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-4">
+                          <div className="text-red-300 font-semibold mb-2">🚫 SERVIDOR NO DISPONIBLE</div>
+                          <div className="text-red-200 text-sm">
+                            {window.location.hostname === 'localhost' ? (
+                              <>
+                                <div>Ejecuta este comando en otra terminal:</div>
+                                <div className="bg-black/50 rounded px-2 py-1 mt-1 font-mono text-xs">
+                                  npm run server
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div>Configura VITE_SERVER_URL en Vercel:</div>
+                                <div className="bg-black/50 rounded px-2 py-1 mt-1 font-mono text-xs">
+                                  VITE_SERVER_URL=https://tu-servidor.com
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={onForceReconnect}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-6 py-3 rounded-xl text-white font-semibold transition-all duration-200 hover:scale-105 shadow-lg animate-pulse"
+                        >
+                          🔄 REINTENTAR CONEXIÓN
+                        </button>
+                      </div>
                     </div>
                   )}
                   {isReconnecting && (
